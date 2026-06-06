@@ -1,0 +1,12 @@
+__pycache__/
+*.py[cod]
+
+.venv/
+.env
+
+data/
+data/logs/
+data/evaluation/reports/
+
+app/__pycache__/
+bot-collect-data/__pycache__/

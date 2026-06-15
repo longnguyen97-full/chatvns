@@ -38,28 +38,24 @@ data
 ```
 
 ## Setup
+dự án sử dụng uv thay cho pip, mang lại tốc độ setup nhanh đáng kể
+
+1. Khởi tạo dự án rỗng: lệnh này sẽ tạo các files được setup sẵn: .gitignore, .python-version, pyproject.toml, main.py, README.md
 
 ```bash
-py -3.11 -m venv .venv
+uv init --python 3.11
 ```
 
-Git Bash:
+2. Cài dependencies:
 
 ```bash
-source .venv/Scripts/activate
+uv add -r requirements.txt
 ```
 
-PowerShell:
-
-```powershell
-.\.venv\Scripts\Activate.ps1
-```
-
-Cài dependencies:
+3. Chạy playwright
 
 ```bash
-pip install -r requirements.txt
-playwright install chromium
+uv run playwright install chromium
 ```
 
 ## Chạy pipeline
@@ -67,19 +63,19 @@ playwright install chromium
 Collect raw data:
 
 ```bash
-python -m app.pipeline collect --tickers tickers --include-news --include-charts
+uv run python -m app.pipeline collect --tickers tickers --include-news --include-charts
 ```
 
 Xử lý raw data và index vào Qdrant:
 
 ```bash
-python -m app.pipeline index
+uv run python -m app.pipeline index
 ```
 
 Mở Streamlit:
 
 ```bash
-python -m app.pipeline chat
+uv run python -m app.pipeline chat
 ```
 
 Website Streamlit có 2 page:
@@ -90,7 +86,7 @@ Website Streamlit có 2 page:
 Chạy end-to-end:
 
 ```bash
-python -m app.pipeline all --tickers tickers --include-news --include-charts
+uv run python -m app.pipeline all --tickers tickers --include-news --include-charts
 ```
 
 Khi chạy `index` hoặc `all`, pipeline sẽ sync `documents/Q&A.md` sang `data/processed/q&a.json` để Streamlit hiển thị sidebar questions.
@@ -181,43 +177,33 @@ Script này chỉ tác động tới `data/raw` và giữ lại `N` phiên bản
 ## Quick start
 Bật Docker, extract source code rồi chạy các bash sau:
 
-1. Tạo môi trường ảo
+1. Cài dependencies
 ```bash
-py -3.11 -m venv .venv
+uv add -r requirements.txt
 ```
 
-2. Attach vào môi trường ảo
+2. Chạy playwright
 ```bash
-source .venv/Scripts/activate
-# .\.venv\Scripts\Activate.ps1 # for PowerShell
+uv run playwright install chromium
 ```
 
-3. Cài dependencies
+3. Chạy project
+3.1. Chạy toàn bộ pipeline end-to-end: crawl data -> mở Streamlit
 ```bash
-pip install -r requirements.txt
-playwright install chromium
+uv run python -m main
 ```
 
-4. Run project
-4.1. Run toàn bộ pipeline end-to-end: crawl data -> mở Streamlit
+3.2. Chỉ mở Streamlit
 ```bash
-python -m app.pipeline all --tickers HPG FPT VNM VCB MBB VPB HDB DXG GEE GEX GEL VIX VIC VHM VPL VRE VJC GAS PLX BSR --include-news --include-charts
+uv run python -m app.pipeline chat
 ```
 
-4.2. Chỉ mở Streamlit
-
+4. Chạy evaluate
 ```bash
-python -m app.pipeline chat
-```
-
-5. Run evaluate
-```bash
-python -m app.evaluate
+uv run python -m app.evaluate
 ``` 
 
-## Crawler
-bật auto crawling trên Windows
-
+5. Lập lịch cào dữ liệu định kỳ (optional)
 ```bash
 .\bot-collect-data\start_scheduler.ps1
 .\bot-collect-data\start_scheduler.ps1 -SkipInitialCrawl

@@ -1,12 +1,23 @@
+# Python-generated files
 __pycache__/
-*.py[cod]
+*.py[oc]
+build/
+dist/
+wheels/
+*.egg-info
 
+# Virtual environments
 .venv/
 .env
 
+# Data and logs
 data/
 data/logs/
 data/evaluation/reports/
 
+# Application-specific cache directories
 app/__pycache__/
+
+# Celery beat schedule files
 bot-collect-data/__pycache__/
+bot-collect-data/celerybeat-schedule*

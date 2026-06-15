@@ -209,3 +209,6 @@ uv run python -m app.evaluate
 .\bot-collect-data\start_scheduler.ps1 -SkipInitialCrawl
 .\bot-collect-data\stop_scheduler.ps1
 ```
+
+## Kiến trúc tổng thể
+![Mô tả ảnh](documents/kien-truc-tong-the.png)

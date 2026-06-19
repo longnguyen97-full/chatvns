@@ -64,6 +64,8 @@ RERANK_API_URL = os.getenv(
     f"https://router.huggingface.co/hf-inference/models/{RERANK_MODEL}",
 )
 RERANK_API_TIMEOUT = float(os.getenv("RERANK_API_TIMEOUT", "60"))
+RERANK_API_RETRIES = int(os.getenv("RERANK_API_RETRIES", "2"))
+RERANK_API_RETRY_BACKOFF = float(os.getenv("RERANK_API_RETRY_BACKOFF", "1"))
 
 CONTEXT_COMPRESSION_ENABLED = os.getenv("CONTEXT_COMPRESSION_ENABLED", "1").strip().lower() not in {
     "0",

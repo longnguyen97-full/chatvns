@@ -161,7 +161,7 @@ Script này chỉ tác động tới `data/raw` và giữ lại `N` phiên bản
 
 - Qdrant chạy qua `docker compose up -d qdrant`
 - Embedding model mặc định: `BAAI/bge-m3` với vector dimension 1024. Embedding bắt buộc gọi Hugging Face API qua `HF_API_KEY`/`HG_API_KEY`; code không tải hoặc chạy model embedding local. Sau khi đổi embedding model/dim/API URL, chạy lại `python -m app.pipeline index` để rebuild Qdrant collection.
-- Retrieval dùng hybrid dense + BM25, sau đó rerank candidates bằng Hugging Face API với `BAAI/bge-reranker-v2-m3`. Có thể tắt bằng `RERANK_ENABLED=0`, hoặc đổi model bằng `RERANK_MODEL`.
+- Retrieval dùng hybrid dense + BM25, sau đó rerank candidates bằng Hugging Face API với `BAAI/bge-reranker-v2-m3`. Reranker tự retry khi timeout/429/5xx và fallback về thứ tự hybrid nếu API vẫn lỗi. Có thể cấu hình `RERANK_API_RETRIES`, `RERANK_API_RETRY_BACKOFF`, tắt bằng `RERANK_ENABLED=0`, hoặc đổi model bằng `RERANK_MODEL`.
 - Answer chính dùng extractive context compression trước khi gọi LLM: chọn các câu liên quan nhất trong từng chunk, vẫn giữ source metadata. Có thể tắt bằng `CONTEXT_COMPRESSION_ENABLED=0`.
 - PDF text được đọc bằng PyMuPDF. Project không dùng OCR; PDF scan không có text layer sẽ không trích được nội dung chữ.
 - LLM mặc định: Gemini, đọc từ `.env`

@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+import re
+
 from app.config import DEFAULT_TOP_K, GEMINI_API_KEY, GEMINI_MODEL, RAW_DIR
 from app.context_compression import compress_chunk_text
 from app.intermarket import build_intermarket_context
@@ -121,6 +123,51 @@ def chunk_source(chunk: RetrievedChunk) -> dict:
     }
 
 
+def friendly_source_label(source: dict) -> str:
+    source_path = str(source.get("source_path") or source.get("artifact_path") or "").lower()
+    ticker = str(source.get("ticker") or source.get("scope") or "thị trường").upper()
+    if source.get("structure_type") == "market_snapshot":
+        return f"Bảng giá {ticker}"
+    if "analysis_report" in source_path:
+        return f"Báo cáo phân tích {ticker}"
+    if "financial_document" in source_path or "financial_documents" in source_path:
+        return f"Báo cáo tài chính {ticker}"
+    if "ticker_news" in source_path or "news_events" in source_path:
+        return f"Tin tức và sự kiện {ticker}"
+    if "stock_overview" in source_path:
+        return f"Tổng quan cổ phiếu {ticker}"
+    if "world_market" in source_path:
+        return "Thị trường thế giới"
+    return f"Nguồn dữ liệu {ticker}"
+
+
+def format_answer_citations(answer: str, sources: list[dict]) -> str:
+    formatted = str(answer)
+    replacements: dict[str, str] = {}
+    for source in sources:
+        label = friendly_source_label(source)
+        url = str(source.get("url") or "").strip()
+        replacement = f"[{label}]({url})" if url else f"**{label}**"
+        for value in [source.get("source_path"), source.get("artifact_path")]:
+            path = str(value or "").strip().replace("\\", "/")
+            if not path:
+                continue
+            variants = {path}
+            if path.startswith("data/"):
+                variants.add(path.removeprefix("data/"))
+            else:
+                variants.add(f"data/{path}")
+            replacements.update({variant: replacement for variant in variants})
+
+    for path in sorted(replacements, key=len, reverse=True):
+        replacement = replacements[path]
+        escaped = re.escape(path)
+        formatted = re.sub(rf"`{escaped}`", replacement, formatted)
+        formatted = re.sub(rf"\({escaped}\)", replacement, formatted)
+        formatted = re.sub(escaped, replacement, formatted)
+    return formatted
+
+
 def answer_question(question: str, ticker: str | None = None, top_k: int = DEFAULT_TOP_K) -> dict:
     chunks = hybrid_retrieve(question, top_k=top_k, ticker=ticker)
     extra_context_parts: list[str] = []
@@ -163,6 +210,7 @@ def answer_question(question: str, ticker: str | None = None, top_k: int = DEFAU
         answer = format_market_snapshot_answer(snapshot)
     else:
         answer = generate_answer(question, chunks, extra_context)
+    answer = format_answer_citations(answer, sources)
     return {
         "question": question,
         "ticker": ticker,

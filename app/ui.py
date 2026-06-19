@@ -138,11 +138,16 @@ def inject_app_css() -> None:
             border: 1px solid #1976D2;
             color: #0A3D91;
         }
-        .stBottom .stChatInput button>svg {
+        .stBottom .stChatInput button>svg,
+        .stMetric>div>*,
+        .stHeading>div h3 {
             color: #0A3D91;
         }
         .stExpander details summary {
             background-color: rgb(43, 44, 54);
+        }
+        .stElementContainer .stMarkdown {
+            color: black;
         }
         </style>
         """,

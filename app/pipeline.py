@@ -80,6 +80,7 @@ def add_collect_args(parser: argparse.ArgumentParser) -> None:
     parser.add_argument("--max-reports", type=int, default=5)
     parser.add_argument("--delay-seconds", type=float, default=1.5)
     parser.add_argument("--timeout", type=int, default=30)
+    parser.add_argument("--min-crawl-interval-minutes", type=float, default=30)
 
 
 def run_collect(args: argparse.Namespace) -> None:
@@ -94,6 +95,8 @@ def run_collect(args: argparse.Namespace) -> None:
         str(args.delay_seconds),
         "--timeout",
         str(args.timeout),
+        "--min-crawl-interval-minutes",
+        str(args.min_crawl_interval_minutes),
     ]
     if args.include_news:
         command.append("--include-news")

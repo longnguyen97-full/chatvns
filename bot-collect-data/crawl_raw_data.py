@@ -10,7 +10,7 @@ import sys
 import time
 import unicodedata
 from dataclasses import dataclass
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 from html.parser import HTMLParser
 from pathlib import Path
 from typing import Iterable
@@ -28,6 +28,7 @@ LOGS_DIR = DATA_DIR / "logs"
 DEFAULT_TICKERS = ["HPG", "FPT", "VCB"]
 DEFAULT_TIMEOUT = 30
 DEFAULT_MAX_REPORTS = 5
+DEFAULT_MIN_CRAWL_INTERVAL_MINUTES = 30
 USER_AGENT = (
     "Mozilla/5.0 (Windows NT 10.0; Win64; x64) "
     "AppleWebKit/537.36 (KHTML, like Gecko) "
@@ -143,6 +144,11 @@ def parse_args() -> argparse.Namespace:
         default=DEFAULT_TIMEOUT,
         help="HTTP timeout in seconds.",
     )
+    parser.add_argument(
+        "--min-crawl-interval-minutes", type=float,
+        default=DEFAULT_MIN_CRAWL_INTERVAL_MINUTES,
+        help="Skip URLs crawled within this many minutes; use 0 to disable.",
+    )
     return parser.parse_args()
 
 
@@ -197,7 +203,9 @@ def build_targets(
     include_news: bool,
     include_charts: bool = False,
 ) -> list[CrawlTarget]:
-    cleaned_tickers = [ticker.strip().upper() for ticker in tickers if ticker.strip()]
+    cleaned_tickers = list(dict.fromkeys(
+        ticker.strip().upper() for ticker in tickers if ticker.strip()
+    ))
     targets: list[CrawlTarget] = []
 
     for ticker in cleaned_tickers:
@@ -267,7 +275,29 @@ def build_targets(
         )
     )
 
-    return targets
+    return list(dict.fromkeys(targets))
+
+
+def load_latest_crawls() -> dict[str, datetime]:
+    latest: dict[str, datetime] = {}
+    metadata_root = RAW_DIR / "metadata"
+    if not metadata_root.exists():
+        return latest
+    for path in metadata_root.rglob("*.metadata.json"):
+        try:
+            data = json.loads(path.read_text(encoding="utf-8"))
+            url = str(data.get("url") or "").strip()
+            value = str(data.get("crawled_at_utc") or "").strip()
+            if not url or not value:
+                continue
+            crawled_at = datetime.fromisoformat(value.replace("Z", "+00:00"))
+            if crawled_at.tzinfo is None:
+                crawled_at = crawled_at.replace(tzinfo=timezone.utc)
+            if url not in latest or crawled_at > latest[url]:
+                latest[url] = crawled_at
+        except (OSError, ValueError, TypeError, json.JSONDecodeError):
+            continue
+    return latest
 
 
 def slugify(value: str) -> str:
@@ -679,6 +709,7 @@ def crawl_follow_up_documents(
     delay_seconds: float,
     logger: logging.Logger,
     seen_follow_up_urls: set[str] | None = None,
+    stored_urls: set[str] | None = None,
 ) -> list[dict]:
     if not html_target.ticker:
         return []
@@ -696,6 +727,14 @@ def crawl_follow_up_documents(
             else "analysis_report"
         )
         for index, report_url in enumerate(report_links, start=1):
+            if stored_urls is not None and report_url in stored_urls:
+                logger.info("Skip previously stored report %s", report_url)
+                follow_up_results.append({
+                    "status": "skipped", "source": "24hmoney",
+                    "ticker": html_target.ticker, "url": report_url,
+                    "reason": "already_stored",
+                })
+                continue
             if seen_follow_up_urls is not None and report_url in seen_follow_up_urls:
                 logger.info("Skip duplicate follow-up report %s", report_url)
                 continue
@@ -713,11 +752,21 @@ def crawl_follow_up_documents(
                 detail_response = session.get(report_url, timeout=timeout)
                 detail_response.raise_for_status()
                 detail_metadata = save_artifacts(detail_target, detail_response, started_at)
+                if stored_urls is not None:
+                    stored_urls.add(report_url)
                 follow_up_results.append({"status": "success", **detail_metadata})
                 logger.info("Stored report detail %s", detail_metadata["artifact_path"])
 
                 pdf_url = extract_24hmoney_pdf_link(detail_response.text)
                 if pdf_url:
+                    if stored_urls is not None and pdf_url in stored_urls:
+                        logger.info("Skip previously stored PDF %s", pdf_url)
+                        follow_up_results.append({
+                            "status": "skipped", "source": "24hmoney",
+                            "ticker": html_target.ticker, "url": pdf_url,
+                            "reason": "already_stored",
+                        })
+                        continue
                     if seen_follow_up_urls is not None and pdf_url in seen_follow_up_urls:
                         logger.info("Skip duplicate follow-up PDF %s", pdf_url)
                         continue
@@ -737,6 +786,8 @@ def crawl_follow_up_documents(
                         crawl_method="requests-follow-up",
                         started_at=pdf_started_at,
                     )
+                    if stored_urls is not None:
+                        stored_urls.add(pdf_url)
                     follow_up_results.append({"status": "success", **pdf_metadata})
                     logger.info("Stored report PDF %s", pdf_metadata["artifact_path"])
             except Exception as exc:  # noqa: BLE001
@@ -758,6 +809,14 @@ def crawl_follow_up_documents(
 
     if html_target.source == "vietstock" and html_target.name == "financial_documents":
         for index, document_url in enumerate(extract_vietstock_document_links(response.text), start=1):
+            if stored_urls is not None and document_url in stored_urls:
+                logger.info("Skip previously stored document %s", document_url)
+                follow_up_results.append({
+                    "status": "skipped", "source": "vietstock",
+                    "ticker": html_target.ticker, "url": document_url,
+                    "reason": "already_stored",
+                })
+                continue
             if seen_follow_up_urls is not None and document_url in seen_follow_up_urls:
                 logger.info("Skip duplicate Vietstock document %s", document_url)
                 continue
@@ -782,6 +841,8 @@ def crawl_follow_up_documents(
                     crawl_method="requests-follow-up",
                     started_at=started_at,
                 )
+                if stored_urls is not None:
+                    stored_urls.add(document_url)
                 follow_up_results.append({"status": "success", **metadata})
                 logger.info("Stored Vietstock document %s", metadata["artifact_path"])
             except Exception as exc:  # noqa: BLE001
@@ -846,18 +907,47 @@ def crawl_targets(
     timeout: int,
     max_reports: int,
     logger: logging.Logger,
+    min_crawl_interval_minutes: float = DEFAULT_MIN_CRAWL_INTERVAL_MINUTES,
 ) -> dict:
     summary: dict[str, object] = {
         "started_at_utc": datetime.now(timezone.utc).isoformat(),
         "total_targets": len(targets),
         "success_count": 0,
         "error_count": 0,
+        "skipped_count": 0,
         "results": [],
     }
     seen_follow_up_urls: set[str] = set()
+    latest_crawls = load_latest_crawls()
+    stored_urls = set(latest_crawls)
 
     for index, target in enumerate(targets, start=1):
         started_at = datetime.now(timezone.utc)
+        previous = latest_crawls.get(target.url)
+        if (
+            min_crawl_interval_minutes > 0
+            and previous is not None
+            and started_at - previous < timedelta(minutes=min_crawl_interval_minutes)
+        ):
+            summary["skipped_count"] = int(summary["skipped_count"]) + 1
+            summary["results"].append(
+                {
+                    "status": "skipped",
+                    "source": target.source,
+                    "ticker": target.ticker,
+                    "name": target.name,
+                    "url": target.url,
+                    "reason": "recently_crawled",
+                    "previous_crawled_at_utc": previous.isoformat(),
+                }
+            )
+            logger.info(
+                "[%s/%s] Skip recently crawled URL %s",
+                index,
+                len(targets),
+                target.url,
+            )
+            continue
         logger.info("[%s/%s] Crawling %s", index, len(targets), target.url)
 
         try:
@@ -865,6 +955,7 @@ def crawl_targets(
                 metadata = capture_chart_screenshot(target, timeout, logger)
                 summary["success_count"] = int(summary["success_count"]) + 1
                 summary["results"].append({"status": "success", **metadata})
+                latest_crawls[target.url] = started_at
                 logger.info("Stored screenshot for %s at %s", target.url, metadata["artifact_path"])
             else:
                 response = session.get(target.url, timeout=timeout)
@@ -872,6 +963,7 @@ def crawl_targets(
                 metadata = save_artifacts(target, response, started_at)
                 summary["success_count"] = int(summary["success_count"]) + 1
                 summary["results"].append({"status": "success", **metadata})
+                latest_crawls[target.url] = started_at
                 logger.info("Stored raw artifact for %s at %s", target.url, metadata["artifact_path"])
 
                 follow_up_results = crawl_follow_up_documents(
@@ -883,11 +975,14 @@ def crawl_targets(
                     delay_seconds=delay_seconds,
                     logger=logger,
                     seen_follow_up_urls=seen_follow_up_urls,
+                    stored_urls=stored_urls,
                 )
                 for record in follow_up_results:
                     summary["results"].append(record)
                     if record["status"] == "success":
                         summary["success_count"] = int(summary["success_count"]) + 1
+                    elif record["status"] == "skipped":
+                        summary["skipped_count"] = int(summary["skipped_count"]) + 1
                     else:
                         summary["error_count"] = int(summary["error_count"]) + 1
         except Exception as exc:  # noqa: BLE001
@@ -928,6 +1023,7 @@ def run_collector(
     max_reports: int = DEFAULT_MAX_REPORTS,
     delay_seconds: float = 1.5,
     timeout: int = DEFAULT_TIMEOUT,
+    min_crawl_interval_minutes: float = DEFAULT_MIN_CRAWL_INTERVAL_MINUTES,
 ) -> dict:
     setup_directories()
     logger = setup_logger()
@@ -941,6 +1037,7 @@ def run_collector(
             "total_targets": 0,
             "success_count": 0,
             "error_count": 1,
+            "skipped_count": 0,
             "results": [],
             "error": "No crawl targets were generated.",
         }
@@ -954,14 +1051,16 @@ def run_collector(
         delay_seconds=delay_seconds,
         timeout=timeout,
         max_reports=max_reports,
+        min_crawl_interval_minutes=min_crawl_interval_minutes,
         logger=logger,
     )
     summary_path = write_run_summary(summary)
     summary["summary_path"] = str(summary_path.relative_to(PROJECT_ROOT)).replace("\\", "/")
 
     logger.info(
-        "Finished crawl. success=%s error=%s summary=%s",
+        "Finished crawl. success=%s skipped=%s error=%s summary=%s",
         summary["success_count"],
+        summary["skipped_count"],
         summary["error_count"],
         summary["summary_path"],
     )
@@ -977,6 +1076,7 @@ def main() -> int:
         max_reports=args.max_reports,
         delay_seconds=args.delay_seconds,
         timeout=args.timeout,
+        min_crawl_interval_minutes=args.min_crawl_interval_minutes,
     )
     return 0 if int(summary["error_count"]) == 0 else 2
 

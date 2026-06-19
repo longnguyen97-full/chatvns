@@ -17,9 +17,32 @@ from app.multimodal import artifact_label, multimodal_artifacts
 from app.observability import append_interaction_log
 from app.qa_suggestions import load_suggested_questions
 from app.rag import answer_question
+from app.market_snapshot import load_latest_market_snapshot
+from app.ui import (
+    freshness_label,
+    inject_app_css,
+    mascot_path,
+    render_disclaimer,
+    render_hero,
+    render_trust_note,
+    render_welcome,
+)
+
+try:
+    from app.ui import apply_metric_card_style, render_section_header
+except ImportError:
+    def apply_metric_card_style() -> None:
+        pass
+
+    def render_section_header(label: str, description: str = "") -> None:
+        st.subheader(label, divider="blue")
+        if description:
+            st.caption(description)
 
 
-st.set_page_config(page_title="ChatVNS RAG", page_icon=":chart_with_upwards_trend:", layout="wide")
+st.set_page_config(page_title="ChatVNS", page_icon=str(mascot_path("chatvns")), layout="wide")
+inject_app_css()
+apply_metric_card_style()
 
 TICKER_PATTERN = re.compile(r"\b[A-Z]{2,5}\b")
 
@@ -67,7 +90,8 @@ def infer_tickers(question: str) -> list[str]:
 
 
 def render_sources(sources: list[dict]) -> None:
-    with st.expander("Sources"):
+    with st.expander("Nguồn tham khảo", expanded=False):
+        render_trust_note()
         seen: set[str] = set()
         for source in sources:
             url = source.get("url")
@@ -121,7 +145,7 @@ def render_multimodal(ticker: str | None, key_prefix: str) -> None:
             if chart:
                 st.image(str(chart), caption=artifact_label(chart), use_container_width=True)
             else:
-                st.info("Chưa có ảnh chart cho mã này.")
+                st.info("Chưa có ảnh biểu đồ cho mã này.")
 
         with tab_tables:
             if tables:
@@ -138,14 +162,14 @@ def render_multimodal(ticker: str | None, key_prefix: str) -> None:
                 except Exception:
                     st.code(table_path.read_text(encoding="utf-8-sig", errors="ignore")[:5000])
             else:
-                st.info("Chưa có CSV table cho mã này.")
+                st.info("Chưa có bảng CSV cho mã này.")
 
         with tab_pdfs:
             if pdfs:
                 for index, pdf in enumerate(pdfs):
                     st.write(f"- {artifact_label(pdf)}: `{pdf.relative_to(PROJECT_ROOT).as_posix()}`")
                     st.download_button(
-                        "Download PDF",
+                        "Tải báo cáo PDF",
                         data=pdf.read_bytes(),
                         file_name=pdf.name,
                         mime="application/pdf",
@@ -158,14 +182,14 @@ def render_multimodal(ticker: str | None, key_prefix: str) -> None:
 ensure_state()
 
 with st.sidebar:
+    st.image(str(mascot_path("chatvns")), width=118)
     st.title("ChatVNS")
-    st.caption("Multimodal RAG Stock VN")
+    st.caption("Trợ lý chứng khoán Việt Nam")
+    st.link_button("💬 Trợ lý phân tích", "/", use_container_width=True)
+    st.link_button("📊 Bảng điều khiển", "/1_Dashboard", use_container_width=True)
+    st.divider()
 
-    # st.page_link("streamlit_app.py", label="Chatbot")
-    # st.page_link("pages/1_Dashboard.py", label="Dashboard")
-    # st.divider()
-
-    if st.button("Clear chat", use_container_width=True):
+    if st.button("Xóa hội thoại", use_container_width=True, icon="🧹"):
         st.session_state.messages = []
         st.rerun()
 
@@ -185,11 +209,25 @@ with st.sidebar:
                         st.rerun()
 
 
-st.title("ChatVNS")
-st.caption("Hỏi đáp trên dữ liệu cổ phiếu đã crawl, xử lý và index.")
+ticker_options = sorted(available_tickers())
+render_hero(len(ticker_options), DEFAULT_TOP_K)
+
+if not st.session_state.messages:
+    render_welcome()
+    starter_questions = [
+        "Tóm tắt nhanh cổ phiếu HPG hiện tại",
+        "FPT có những động lực tăng trưởng nào?",
+        "Phân tích kỹ thuật VCB với dữ liệu hiện có",
+    ]
+    starter_cols = st.columns(3)
+    for starter_index, (column, question) in enumerate(zip(starter_cols, starter_questions)):
+        if column.button(question, key=f"starter_{starter_index}", use_container_width=True):
+            st.session_state.pending_prompt = question
+            st.rerun()
 
 for message_index, message in enumerate(st.session_state.messages):
-    with st.chat_message(message["role"]):
+    avatar = str(mascot_path("chat")) if message["role"] == "assistant" else "👤"
+    with st.chat_message(message["role"], avatar=avatar):
         st.markdown(message["content"])
         if message.get("sources"):
             render_sources(message["sources"])
@@ -199,7 +237,7 @@ for message_index, message in enumerate(st.session_state.messages):
             for ticker in message["tickers"]:
                 render_multimodal(ticker, key_prefix=f"history_{message_index}_{ticker}")
 
-prompt = st.session_state.pending_prompt or st.chat_input("Nhập câu hỏi về cổ phiếu...")
+prompt = st.session_state.pending_prompt or st.chat_input("Hỏi về một mã cổ phiếu, báo cáo hoặc chỉ báo kỹ thuật...")
 st.session_state.pending_prompt = None
 
 if prompt:
@@ -207,17 +245,28 @@ if prompt:
     detected_ticker = detected_tickers[0] if len(detected_tickers) == 1 else None
     st.session_state.messages.append({"role": "user", "content": prompt})
 
-    with st.chat_message("user"):
+    with st.chat_message("user", avatar="👤"):
         st.markdown(prompt)
 
-    with st.chat_message("assistant"):
-        with st.spinner("Retrieving context..."):
+    with st.chat_message("assistant", avatar=str(mascot_path("chat"))):
+        with st.status("Đang tìm dữ liệu và kiểm tra nguồn...", expanded=True) as status:
+            progress_col, mascot_col = st.columns([4, 1])
+            progress_col.write("Truy xuất kết hợp → xếp hạng lại → tạo câu trả lời")
+            mascot_col.image(str(mascot_path("processing")), width=72)
             started_at = time.perf_counter()
             result = answer_question(prompt, ticker=detected_ticker, top_k=DEFAULT_TOP_K)
             latency_ms = round((time.perf_counter() - started_at) * 1000, 2)
+            status.update(label=f"Đã hoàn tất trong {latency_ms / 1000:.1f}s", state="complete", expanded=False)
 
         answer = result["answer"]
         st.write_stream(stream_text(answer))
+
+        if detected_ticker:
+            snapshot = load_latest_market_snapshot(detected_ticker)
+            if snapshot:
+                updated_at = snapshot.row.get("crawled_at_utc") or snapshot.row.get("updated_at")
+                label, css_class = freshness_label(updated_at)
+                st.markdown(f'<span class="{css_class}">&#9679; {label}</span>', unsafe_allow_html=True)
 
         sources = result.get("sources", [])
         if sources:
@@ -252,3 +301,6 @@ if prompt:
             ],
         }
     )
+
+
+render_disclaimer()

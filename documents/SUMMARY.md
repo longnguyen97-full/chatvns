@@ -77,10 +77,12 @@ Project hiện dùng một flow evaluation duy nhất:
 .\.venv\Scripts\python.exe -m app.evaluate
 ```
 
-Bộ metrics đã rút gọn còn 6 metric chính:
+Bộ metrics đã rút gọn còn 8 metric chính:
 
 | Nhóm | Metric | Ý nghĩa |
 | --- | --- | --- |
+| Retrieval | Precision@5 | Tỷ lệ chunk liên quan trong top-5 kết quả |
+| Retrieval | Hit Rate@5 | Tỷ lệ câu hỏi có ít nhất một kết quả liên quan trong top-5 |
 | Retrieval | Recall@5 | Tỷ lệ expected evidence xuất hiện trong top-5 chunks |
 | Retrieval | MRR | Thứ hạng của chunk liên quan đầu tiên |
 | Generation | Faithfulness | Câu trả lời có được hỗ trợ bởi context hay không |
@@ -439,6 +441,8 @@ Main flow:
 
 8. Evaluation:
    - Recall@5
+   - Precision@5
+   - Hit Rate@5
    - MRR
    - Faithfulness
    - Answer Relevancy

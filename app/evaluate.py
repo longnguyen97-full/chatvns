@@ -317,6 +317,8 @@ def evaluate_retrieval_case(case: dict, top_k: int) -> dict:
             "matched_evidence_count": 0,
             "strict_evaluation": bool(case.get("expected_chunks")),
             "recall_at_k": None,
+            "precision_at_k": None,
+            "hit_rate_at_k": None,
             "first_relevant_rank": None,
             "mrr": None,
             "qualitative_top_chunks": [],
@@ -342,6 +344,18 @@ def evaluate_retrieval_case(case: dict, top_k: int) -> dict:
     if strict_evaluation and relevance_flags and first_relevant_rank is None:
         first_relevant_rank = next((rank for rank, flag in enumerate(relevance_flags, start=1) if flag), None)
 
+    evaluated_flags = relevance_flags[:top_k]
+    precision_denominator = len(evaluated_flags)
+    relevant_retrieved_count = sum(evaluated_flags) if strict_evaluation else 0
+    precision_at_k = (
+        relevant_retrieved_count / precision_denominator
+        if strict_evaluation and precision_denominator > 0
+        else (0.0 if strict_evaluation else None)
+    )
+    hit_rate_at_k = (
+        float(any(evaluated_flags)) if strict_evaluation else None
+    )
+
     return {
         "case_id": case["id"],
         "question": case["question"],
@@ -351,7 +365,10 @@ def evaluate_retrieval_case(case: dict, top_k: int) -> dict:
         "strict_evaluation": strict_evaluation,
         "expected_evidence_count": expected_count,
         "matched_evidence_count": len(matched_ranks),
+        "relevant_retrieved_count": relevant_retrieved_count if strict_evaluation else None,
         "recall_at_k": round(coverage, 3) if coverage is not None else None,
+        "precision_at_k": round(precision_at_k, 3) if precision_at_k is not None else None,
+        "hit_rate_at_k": round(hit_rate_at_k, 3) if hit_rate_at_k is not None else None,
         "first_relevant_rank": first_relevant_rank,
         "mrr": round(1 / first_relevant_rank, 4) if first_relevant_rank else None,
         "qualitative_top_chunks": [
@@ -794,6 +811,8 @@ def summarize_retrieval(results: list[dict]) -> dict:
     strict_results = [result for result in results if result.get("strict_evaluation")]
     mrr_values = numeric_values(strict_results, "mrr")
     recall_at_k_values = numeric_values(strict_results, "recall_at_k")
+    precision_at_k_values = numeric_values(strict_results, "precision_at_k")
+    hit_rate_at_k_values = numeric_values(strict_results, "hit_rate_at_k")
     latencies = [result["latency_ms"] for result in results]
     return {
         "case_count": total,
@@ -802,6 +821,8 @@ def summarize_retrieval(results: list[dict]) -> dict:
         "smoke_case_count": total - len(strict_results),
         "mean_mrr": round(statistics.mean(mrr_values), 3) if mrr_values else None,
         "recall_at_k": mean_or_zero(recall_at_k_values) if recall_at_k_values else None,
+        "precision_at_k": mean_or_zero(precision_at_k_values) if precision_at_k_values else None,
+        "hit_rate_at_k": mean_or_zero(hit_rate_at_k_values) if hit_rate_at_k_values else None,
         "latency_ms": latency_summary(latencies),
     }
 
@@ -845,6 +866,8 @@ def build_markdown_report(report: dict) -> str:
         f"- Smoke-only cases: {retrieval_summary.get('smoke_case_count', 0)}",
         f"- Mean MRR: {retrieval_summary['mean_mrr']}",
         f"- Recall@{report['top_k']}: {retrieval_summary['recall_at_k']}",
+        f"- Precision@{report['top_k']}: {retrieval_summary['precision_at_k']}",
+        f"- Hit Rate@{report['top_k']}: {retrieval_summary['hit_rate_at_k']}",
         "",
         "### Qualitative examples",
     ]
@@ -855,7 +878,9 @@ def build_markdown_report(report: dict) -> str:
                 f"- Case `{case['case_id']}`: {case['question']}",
                 (
                     f"  strict={case.get('strict_evaluation', False)} "
-                    f"mrr={case['mrr']} recall_at_k={case.get('recall_at_k', 'N/A')}"
+                    f"mrr={case['mrr']} recall_at_k={case.get('recall_at_k', 'N/A')} "
+                    f"precision_at_k={case.get('precision_at_k', 'N/A')} "
+                    f"hit_rate_at_k={case.get('hit_rate_at_k', 'N/A')}"
                 ),
             ]
         )

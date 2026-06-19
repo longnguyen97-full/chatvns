@@ -7,6 +7,8 @@ Tai lieu nay mo ta bo metrics hien tai cua ChatVNS sau khi rut gon ve mot flow d
 ### A. Retrieval
 
 - `Recall@5`
+- `Precision@5`
+- `Hit Rate@5`
 - `MRR`
 
 ### B. DeepEval
@@ -22,6 +24,8 @@ Tai lieu nay mo ta bo metrics hien tai cua ChatVNS sau khi rut gon ve mot flow d
 | Nhom       | Metric             |
 | ---------- | ------------------ |
 | Retrieval  | Recall@5           |
+| Retrieval  | Precision@5        |
+| Retrieval  | Hit Rate@5         |
 | Retrieval  | MRR                |
 | Generation | Faithfulness       |
 | Generation | Answer Relevancy   |
@@ -31,6 +35,10 @@ Tai lieu nay mo ta bo metrics hien tai cua ChatVNS sau khi rut gon ve mot flow d
 ## Cach tinh
 
 `Recall@5` do ty le expected evidence xuat hien trong top-5 retrieved chunks. Metric nay dang tin nhat khi eval case co `expected_chunks`.
+
+`Precision@5` do ty le chunk lien quan trong cac ket qua duoc tra ve o top-5.
+
+`Hit Rate@5` bang 1 neu co it nhat mot chunk lien quan trong top-5, nguoc lai bang 0.
 
 `MRR` do thu hang cua chunk lien quan dau tien. Chunk lien quan dung cang cao thi MRR cang cao.
 
@@ -64,7 +72,7 @@ Khi `.env` co `GEMINI_API_KEY`, DeepEval mac dinh dung `GEMINI_MODEL`. Co the ep
 
 Dashboard chi hien thi report moi nhat trong `data/evaluation/reports` va gom metrics thanh mot khu vuc Evaluation:
 
-- Retrieval: `Recall@5`, `MRR`
+- Retrieval: `Recall@5`, `Precision@5`, `Hit Rate@5`, `MRR`
 - Generation: `Faithfulness`, `Answer Relevancy`
 - Finance: `Numerical Accuracy`, `Citation Accuracy`
 - Performance: `Retrieval p95 ms`, `Answer p95 ms`
@@ -117,7 +125,7 @@ Latency theo tung evaluation case trong phan retrieval/generation summary:
 
 ### Luu y ve fallback
 
-Run nay co du 6 metrics tren Dashboard, nhung cac metric generation/finance dang dung fallback cuc bo:
+Run nay co du 8 metrics tren Dashboard, nhung cac metric generation/finance dang dung fallback cuc bo:
 
 | Fallback | So cases |
 | -------- | -------- |

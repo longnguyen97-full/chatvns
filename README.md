@@ -82,6 +82,7 @@ Website Streamlit có 2 page:
 
 - `Chatbot`: hỏi đáp RAG trên dữ liệu cổ phiếu.
 - `Dashboard`: giám sát dữ liệu raw/processed, indexed chunks, crawl summary và evaluation report.
+- Giao diện dùng bộ mascot trong `assets/mascots`, theme tiếng Việt và `streamlit-extras` cho metric cards.
 
 Chạy end-to-end:
 
@@ -120,7 +121,7 @@ Tùy chỉnh top-k, số lần đo latency và file cases:
 .\.venv\Scripts\python.exe -m app.evaluate --top-k 5 --repeats 3 --cases data/evaluation/eval_cases.json
 ```
 
-Bộ evaluation hiện tại đã được rút gọn về một flow duy nhất. Chỉ cần chạy một lệnh để report/Dashboard có đủ: Recall@5, MRR, Faithfulness, Answer Relevancy, Numerical Accuracy và Citation Accuracy:
+Bộ evaluation hiện tại đã được rút gọn về một flow duy nhất. Chỉ cần chạy một lệnh để report/Dashboard có đủ: Recall@5, Precision@5, Hit Rate@5, MRR, Faithfulness, Answer Relevancy, Numerical Accuracy và Citation Accuracy:
 
 ```bash
 .\.venv\Scripts\python.exe -m app.evaluate
@@ -171,7 +172,7 @@ Script này chỉ tác động tới `data/raw` và giữ lại `N` phiên bản
 1. **Local interaction logs:** Mỗi câu hỏi gửi tới chatbot đều được ghi vào `data/logs/chatbot_interactions.jsonl`.
 2. **Dashboard:** Theo dõi số lượt hỏi, độ trễ (latency), số lượng nguồn (source count), inventory thô/đã xử lý và báo cáo đánh giá.
 3. **Offline evaluation:** Chạy `app.evaluate` để tạo báo cáo về retrieval, generation và hiệu năng.
-4. **Metrics:** Bộ metrics đã rút gọn gồm `Recall@5`, `MRR`, `Faithfulness`, `Answer Relevancy`, `Numerical Accuracy`, `Citation Accuracy`.
+4. **Metrics:** Bộ metrics đã rút gọn gồm `Recall@5`, `Precision@5`, `Hit Rate@5`, `MRR`, `Faithfulness`, `Answer Relevancy`, `Numerical Accuracy`, `Citation Accuracy`.
 5. **Evaluate:** `python -m app.evaluate` tạo một report chung, trong đó DeepEval bổ sung `Faithfulness` và `Answer Relevancy` bằng LLM-as-a-Judge.
 
 ## Quick start

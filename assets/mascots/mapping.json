@@ -1,0 +1,28 @@
+{
+    "mascots": {
+        "welcome": {
+            "file": "welcome.png",
+            "description": "Màn hình chào mừng khi chưa có hội thoại."
+        },
+        "chat": {
+            "file": "chat.png",
+            "description": "Avatar của ChatVNS hiển thị trong mỗi tin nhắn."
+        },
+        "insight": {
+            "file": "insight.png",
+            "description": "Xuất hiện khi chatbot đưa ra phân tích hoặc khuyến nghị."
+        },
+        "processing": {
+            "file": "processing.png",
+            "description": "Hiển thị khi hệ thống đang truy xuất dữ liệu hoặc tạo câu trả lời."
+        },
+        "trust": {
+            "file": "trust.png",
+            "description": "Hiển thị cạnh nguồn tham khảo (Sources) để nhấn mạnh độ tin cậy."
+        },
+        "brand": {
+            "file": "chatvns.png",
+            "description": "Mascot thương hiệu chính của ChatVNS."
+        }
+    }
+}

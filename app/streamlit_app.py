@@ -237,7 +237,11 @@ for message_index, message in enumerate(st.session_state.messages):
             for ticker in message["tickers"]:
                 render_multimodal(ticker, key_prefix=f"history_{message_index}_{ticker}")
 
-prompt = st.session_state.pending_prompt or st.chat_input("Hỏi về một mã cổ phiếu, báo cáo hoặc chỉ báo kỹ thuật...")
+typed_prompt = st.chat_input(
+    "Hỏi về một mã cổ phiếu, báo cáo hoặc chỉ báo kỹ thuật...",
+    key="chat_question",
+)
+prompt = st.session_state.pending_prompt or typed_prompt
 st.session_state.pending_prompt = None
 
 if prompt:
@@ -301,6 +305,7 @@ if prompt:
             ],
         }
     )
+    st.rerun()
 
 
 render_disclaimer()

@@ -60,7 +60,7 @@ def inject_app_css() -> None:
             border-color: #6ed7ff;
             background: rgba(255,255,255,.18);
         }
-        .block-container { max-width: 1180px; padding-top: 4.5rem; padding-bottom: 5rem; }
+        .block-container { padding-top: 5rem; padding-right: 2.5rem; padding-bottom: 5rem; padding-left: 2.5rem; }
         .chatvns-hero {
             display: flex; align-items: center; gap: 1.25rem;
             padding: 1.15rem 1.35rem; margin-bottom: 1rem;
@@ -130,8 +130,9 @@ def inject_app_css() -> None:
             background: white;
         }
         .stBottom .stChatInput textarea,
-        .stBottom .stChatInput textarea::placeholder {
+        .stBottom .stChatInput textarea::placeholder  {
             color: #5c7189;
+            caret-color: #5c7189;
         }
         .stBottom .stChatInput button {
             background: #FFFFFF;

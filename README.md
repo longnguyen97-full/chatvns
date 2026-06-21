@@ -4,6 +4,15 @@ MVP chatbot RAG cho dữ liệu cổ phiếu Việt Nam. Repo này tập trung v
 
 `collect raw data -> process/chunk -> embed/index -> retrieve -> answer -> Streamlit UI`
 
+## Demo
+
+🌐 Live Demo: https://huggingface.co/spaces/liamxdev/chatvns
+
+Demo cung cấp:
+
+- Chatbot RAG hỏi đáp về dữ liệu cổ phiếu Việt Nam
+- Giao diện Streamlit tiếng Việt
+
 ## Tài liệu chính
 
 - Data spec: `documents/DATA.md`
